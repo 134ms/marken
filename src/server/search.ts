@@ -1,0 +1,97 @@
+import { readFile } from 'node:fs/promises'
+import MiniSearch from 'minisearch'
+import path from 'node:path'
+import type { Vault } from './vault.js'
+import type { SearchHit } from '../shared/types.js'
+
+interface Doc {
+  id: string
+  path: string
+  title: string
+  body: string
+}
+
+/** Strip Markdown-ish noise from body text before snippetting. */
+function plainify(md: string): string {
+  return md
+    .replace(/```[\s\S]*?```/g, ' ')      // fenced code
+    .replace(/`[^`]*`/g, ' ')              // inline code
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // images
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // links → text
+    .replace(/^#{1,6}\s+/gm, '')           // headings
+    .replace(/^[*\->]\s+/gm, '')           // list markers
+    .replace(/[*_~`>#-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function deriveTitle(md: string, fallback: string): string {
+  const m = md.match(/^\s*#\s+(.+?)\s*$/m)
+  return m?.[1] ?? fallback
+}
+
+export class SearchIndex {
+  private index = new MiniSearch<Doc>({
+    fields: ['title', 'body'],
+    storeFields: ['title', 'path', 'body'],
+    searchOptions: {
+      boost: { title: 3 },
+      prefix: true,
+      fuzzy: 0.1,
+      combineWith: 'AND',
+    },
+  })
+
+  constructor(private vault: Vault) {}
+
+  async build(): Promise<void> {
+    const docs: Doc[] = []
+    for (const p of this.vault.allDocuments()) {
+      const abs = this.vault.resolve(p)
+      if (!abs) continue
+      try {
+        const raw = await readFile(abs, 'utf8')
+        const title = deriveTitle(raw, path.posix.basename(p).replace(/\.md$/i, ''))
+        const body = plainify(raw)
+        docs.push({ id: p, path: p, title, body })
+      } catch {
+        // skip unreadable files
+      }
+    }
+    this.index.removeAll()
+    this.index.addAll(docs)
+  }
+
+  query(q: string, limit = 25): SearchHit[] {
+    if (!q.trim()) return []
+    const results = this.index.search(q, { combineWith: 'AND' })
+    return results.slice(0, limit).map((r) => {
+      const body = String(r['body'] ?? '')
+      const snippet = makeSnippet(body, q)
+      return {
+        path: String(r['path']),
+        title: String(r['title']),
+        snippet,
+        score: r.score,
+      }
+    })
+  }
+}
+
+function makeSnippet(body: string, query: string): string {
+  const terms = query.trim().split(/\s+/).filter((t) => t.length >= 2)
+  if (terms.length === 0) return body.slice(0, 160)
+  const lower = body.toLowerCase()
+  let pos = -1
+  for (const t of terms) {
+    const i = lower.indexOf(t.toLowerCase())
+    if (i !== -1 && (pos === -1 || i < pos)) pos = i
+  }
+  if (pos === -1) return body.slice(0, 160)
+  const start = Math.max(0, pos - 60)
+  const end = Math.min(body.length, pos + 120)
+  let s = body.slice(start, end)
+  if (start > 0) s = '…' + s
+  if (end < body.length) s = s + '…'
+  return s
+}
