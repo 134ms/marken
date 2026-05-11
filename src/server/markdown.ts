@@ -139,7 +139,9 @@ export class Renderer {
       }),
       slugify,
     })
-    this.md.use(taskLists, { enabled: true, label: false })
+    // `enabled: false` renders task-list checkboxes with the `disabled`
+     // attribute, which is what we want — Marken is a read-only viewer.
+    this.md.use(taskLists, { enabled: false, label: false })
     this.md.use(katex, { throwOnError: false, output: 'html' })
     this.md.use(wikiLinks)
     patchMermaid(this.md)

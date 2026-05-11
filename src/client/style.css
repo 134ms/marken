@@ -35,8 +35,11 @@
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace;
 
   --header-h: 56px;
-  --side-w: 280px;
-  --right-w: 240px;
+  /* Sidebar widths scale with viewport: floor on smaller screens, cap so
+   * even on ultrawide monitors the side panels stay narrower than the
+   * reading column. Mobile breakpoints below override these. */
+  --side-w: clamp(280px, 23vw, 560px);
+  --right-w: clamp(240px, 18vw, 440px);
   --content-max: 760px;
   --radius-sm: 6px;
   --radius-md: 10px;
