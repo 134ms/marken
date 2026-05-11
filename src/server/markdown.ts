@@ -5,6 +5,7 @@ import katex from '@traptitech/markdown-it-katex'
 import hljs from 'highlight.js/lib/common'
 import path from 'node:path'
 import { wikiLinks, type WikiLinkContext } from './wikilinks.js'
+import { stripFrontMatter } from './frontmatter.js'
 import type { Vault } from './vault.js'
 import type { OutlineItem } from '../shared/types.js'
 
@@ -14,6 +15,8 @@ export interface RenderResult {
   firstHeading: string | null
   /** Whether the document includes mermaid code blocks (so the client knows to load mermaid) */
   hasMermaid: boolean
+  /** Parsed YAML front-matter keys (top-level scalars only) */
+  frontMatter: Record<string, string>
 }
 
 function slugify(s: string): string {
@@ -145,6 +148,7 @@ export class Renderer {
   }
 
   render(source: string, currentPath: string): RenderResult {
+    const { data: frontMatter, body } = stripFrontMatter(source)
     const wikiCtx: WikiLinkContext = {
       currentPath,
       resolveLink: (target, current) => this.vault.resolveWikiLink(target, current),
@@ -164,12 +168,13 @@ export class Renderer {
       hasMermaid?: boolean
       wikiLink: WikiLinkContext
     } = { docPath: currentPath, wikiLink: wikiCtx }
-    const html = this.md.render(source, env)
+    const html = this.md.render(body, env)
     return {
       html,
       outline: env.outline ?? [],
       firstHeading: env.firstHeading ?? null,
       hasMermaid: env.hasMermaid === true,
+      frontMatter,
     }
   }
 }

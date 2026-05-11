@@ -108,7 +108,9 @@ async function start() {
     }
     const src = await readFile(file.absPath, 'utf8')
     const result = renderer.render(src, file.relativePath)
-    const meta = vault.buildDocumentMeta(file.relativePath, result.firstHeading)
+    // Front-matter `title` wins over the first H1 if present.
+    const docTitle = result.frontMatter['title']?.trim() || result.firstHeading
+    const meta = vault.buildDocumentMeta(file.relativePath, docTitle ?? null)
     const html = renderDocumentPage({
       siteTitle: config.siteTitle,
       docPath: file.relativePath,

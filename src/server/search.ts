@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import MiniSearch from 'minisearch'
 import path from 'node:path'
 import type { Vault } from './vault.js'
+import { stripFrontMatter } from './frontmatter.js'
 import type { SearchHit } from '../shared/types.js'
 
 interface Doc {
@@ -51,8 +52,10 @@ export class SearchIndex {
       if (!abs) continue
       try {
         const raw = await readFile(abs, 'utf8')
-        const title = deriveTitle(raw, path.posix.basename(p).replace(/\.md$/i, ''))
-        const body = plainify(raw)
+        const { data, body: bodySrc } = stripFrontMatter(raw)
+        const fallback = path.posix.basename(p).replace(/\.md$/i, '')
+        const title = data['title']?.trim() || deriveTitle(bodySrc, fallback)
+        const body = plainify(bodySrc)
         docs.push({ id: p, path: p, title, body })
       } catch {
         // skip unreadable files
