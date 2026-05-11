@@ -35,6 +35,7 @@ Open <http://localhost:8080>. Marken redirects to the first document in your vau
 | Raw / download | `https://example.com/raw/<relative-path>` |
 | Tree JSON | `https://example.com/api/tree` |
 | Search JSON | `https://example.com/api/search?q=...` |
+| Refresh (POST) | `https://example.com/api/refresh[?path=<relative>]` — token-gated |
 
 Example: a vault file at `notes/meetings/2026-01-15.md` is viewable at
 `https://example.com/view/notes/meetings/2026-01-15.md`.
@@ -50,6 +51,34 @@ All settings are environment variables:
 | `MARKEN_HOST` | `0.0.0.0` | Bind address |
 | `MARKEN_TITLE` | `Marken` | Site name in the header |
 | `MARKEN_STATIC_ROOT` | `dist/static` | Where the client bundle and CSS live (relative to CWD) |
+| `MARKEN_API_TOKEN` | _(unset)_ | Bearer token for write APIs (`/api/refresh`). When unset, those endpoints return 503. |
+| `MARKEN_RESCAN_INTERVAL` | `0` | Periodic full-vault rescan interval, in seconds. `0` disables polling. Set this on filesystems where inotify doesn't fire reliably (GCS FUSE, NFS, SMB). |
+
+## Picking up vault changes
+
+Marken keeps an in-memory tree and search index. Three ways to refresh them:
+
+1. **`fs.watch`** — fires automatically on local filesystems and Docker bind mounts. No config needed.
+2. **`MARKEN_RESCAN_INTERVAL=<seconds>`** — periodic safety net. Use on FUSE / network mounts where inotify is silent for out-of-band changes (e.g. `gsutil` writes to a GCS bucket mounted via the GCS FUSE CSI driver).
+3. **`POST /api/refresh`** — explicit trigger. Useful for wiring up to a webhook (e.g. GCS Pub/Sub object notifications). With an optional `?path=<relative-vault-path>`, only that file or folder is rescanned — cheap on large vaults.
+
+```bash
+# Full rescan
+curl -X POST -H "Authorization: Bearer $MARKEN_API_TOKEN" \
+  https://marken.example.com/api/refresh
+
+# Incremental — single file
+curl -X POST -H "Authorization: Bearer $MARKEN_API_TOKEN" \
+  "https://marken.example.com/api/refresh?path=notes/today.md"
+
+# Incremental — folder (handles creates/moves/deletes inside it)
+curl -X POST -H "Authorization: Bearer $MARKEN_API_TOKEN" \
+  "https://marken.example.com/api/refresh?path=notes/2026"
+```
+
+The response is `{ "ok": true, "added": [...], "removed": [...], "modified": [...] }` listing the markdown paths whose state changed. The server re-reads only those files into the search index.
+
+On GCS FUSE specifically, also lower the metadata cache TTLs on the mount so a rescan actually sees fresh state — e.g. `--stat-cache-ttl=10s --type-cache-ttl=10s --kernel-list-cache-ttl-secs=10`.
 
 ## Building from source
 

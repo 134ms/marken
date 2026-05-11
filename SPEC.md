@@ -41,6 +41,7 @@ Don't swap any of these without a reason. The size budget is the constraint that
 | `/raw/<path>` | Serve a vault file as bytes (Markdown gets `Content-Disposition: attachment`; everything else by inferred MIME) |
 | `/api/tree` | Vault tree as JSON |
 | `/api/search?q=` | Search hits as JSON |
+| `POST /api/refresh[?path=]` | Trigger a refresh of the tree + search index. Bearer-auth via `MARKEN_API_TOKEN`. Optional `path` scopes the refresh to a single file or folder. |
 | `/static/*` | Client bundle, CSS, KaTeX assets |
 
 Reserved prefixes: `/view`, `/raw`, `/api`, `/static`. The vault must not contain top-level entries named any of these, or paths would collide.
@@ -60,6 +61,8 @@ Inside a rendered document:
 | `MARKEN_HOST` | `0.0.0.0` | Bind address |
 | `MARKEN_TITLE` | `Marken` | Site name in the header |
 | `MARKEN_STATIC_ROOT` | `dist/static` | Static asset directory, relative to CWD |
+| `MARKEN_API_TOKEN` | _(unset)_ | Bearer token for write endpoints. Endpoints return 503 when unset. |
+| `MARKEN_RESCAN_INTERVAL` | `0` (off) | Periodic full-vault rescan, in seconds. Enable on FUSE/network mounts. |
 
 ## Architecture
 
@@ -116,7 +119,7 @@ Modern, polished, content-focused. Clean three-column reading layout, refined ty
 
 - Editing, commenting, or anything that writes to the vault.
 - Authentication. Deploy behind a reverse proxy if you need it.
-- Persistent search index. We rebuild at startup; vault changes during runtime trigger a debounced reindex via `fs.watch` (best-effort; inotify on Docker bind mounts is unreliable).
+- Persistent search index. We rebuild at startup; vault changes during runtime are picked up via three mechanisms: `fs.watch` (fast path on local FS), `MARKEN_RESCAN_INTERVAL` (poll fallback on FUSE/network mounts), and `POST /api/refresh` (explicit trigger, supports `?path=` for cheap incremental updates).
 - Multi-vault. One container, one vault.
 - Client-side routing. Every navigation is a full page load. That's deliberate — the SSR is the point.
 - iOS-Files-style column drilldown for the mobile tree. Current mobile UX is the same nested tree inside a drawer; revisit if the drawer feels cramped.
@@ -129,4 +132,6 @@ Modern, polished, content-focused. Clean three-column reading layout, refined ty
 - **Outline's `useState` initializer must handle empty items.** It does (`items[0]?.slug ?? null` with a default `items = []`), but be careful if you refactor.
 - **Mermaid is heavy.** ~600 KB main chunk + per-diagram-type sub-chunks. Keep it lazy. Don't import it from the main client bundle.
 - **`@hono/node-server` `serveStatic` appends the request path to `root`.** Use `rewriteRequestPath` to strip the `/static/` prefix so files resolve to `dist/static/<file>`, not `dist/static/static/<file>`.
-- **The vault watcher uses `Object.assign(vault, refreshed)` to swap state in place.** That's a hack — sufficient for now, but if `Vault` grows non-data state, swap to a proper container with a `getCurrent()` accessor.
+- **`fs.watch` is silent on FUSE / network mounts for out-of-band changes.** A `gsutil` write from a laptop to a GCS bucket never reaches the GKE node's kernel, so inotify never fires on the gcsfuse mount. Marken pairs the watcher with `MARKEN_RESCAN_INTERVAL` polling and a `POST /api/refresh?path=…` endpoint so deployments can pick changes up reliably. Lower gcsfuse's `--stat-cache-ttl` / `--type-cache-ttl` / `--kernel-list-cache-ttl-secs` so rescans actually see fresh state.
+- **Refresh ops are serialized.** Both vault mutation (`refreshAll`/`refreshPath`) and the server-side `performRefresh` queue concurrent triggers — otherwise overlapping watcher + polling + API calls could splice into a tree mid-walk. The serialization is a promise chain, not a real lock; throughput isn't a goal here.
+- **Search index updates are diff-driven.** `Vault.refresh*` returns `{ added, removed, modified }`; `SearchIndex.applyDiff` only re-reads those files. Don't reintroduce a full `search.build()` on every change — it doesn't scale on FUSE-backed vaults.

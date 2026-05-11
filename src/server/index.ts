@@ -8,7 +8,7 @@ import { Readable } from 'node:stream'
 import mime from 'mime'
 
 import { config } from './config.js'
-import { Vault } from './vault.js'
+import { Vault, type RefreshDiff } from './vault.js'
 import { Renderer } from './markdown.js'
 import { SearchIndex } from './search.js'
 import {
@@ -41,18 +41,42 @@ async function start() {
   const search = new SearchIndex(vault)
   await search.build()
 
-  // Rebuild on file changes (best-effort; debounced).
+  // Serialize concurrent refresh triggers so vault + search updates stay in
+  // lockstep (one refresh's tree state matches the diff its search update sees).
+  let refreshQueue: Promise<unknown> = Promise.resolve()
+  function performRefresh(rawPath: string | null): Promise<RefreshDiff> {
+    const next = refreshQueue.then(
+      () => runRefresh(rawPath),
+      () => runRefresh(rawPath),
+    )
+    refreshQueue = next.catch(() => undefined)
+    return next
+  }
+  async function runRefresh(rawPath: string | null): Promise<RefreshDiff> {
+    const diff = rawPath ? await vault.refreshPath(rawPath) : await vault.refreshAll()
+    await search.applyDiff(diff)
+    return diff
+  }
+
+  // Local-filesystem fast path: inotify-driven rebuilds. Best-effort; FUSE and
+  // network mounts won't fire these for out-of-band changes.
   vault.startWatch(() => {
-    void (async () => {
-      try {
-        const refreshed = await Vault.create(config.vaultPath)
-        Object.assign(vault, refreshed)
-        await search.build()
-      } catch {
-        /* ignore transient errors during reload */
-      }
-    })()
+    void performRefresh(null).catch((err) => {
+      console.error('[marken] watch-triggered rescan failed:', err)
+    })
   })
+
+  // Polling fallback for filesystems where inotify doesn't fire (GCS FUSE, NFS,
+  // SMB, etc.). Disabled when MARKEN_RESCAN_INTERVAL is unset or 0.
+  if (config.rescanIntervalSeconds > 0) {
+    const intervalMs = config.rescanIntervalSeconds * 1000
+    setInterval(() => {
+      void performRefresh(null).catch((err) => {
+        console.error('[marken] periodic rescan failed:', err)
+      })
+    }, intervalMs)
+    console.log(`[marken] periodic rescan every ${config.rescanIntervalSeconds}s`)
+  }
 
   const app = new Hono()
 
@@ -77,6 +101,31 @@ async function start() {
   app.get('/api/search', (c) => {
     const q = c.req.query('q') ?? ''
     return c.json(search.query(q))
+  })
+
+  app.post('/api/refresh', async (c) => {
+    if (!config.apiToken) {
+      return c.json({ error: 'api disabled — set MARKEN_API_TOKEN to enable' }, 503)
+    }
+    const auth = c.req.header('authorization') ?? ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+    if (!token || token !== config.apiToken) {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    const rawPath = c.req.query('path') ?? null
+    try {
+      const diff = await performRefresh(rawPath && rawPath.trim() ? rawPath : null)
+      return c.json({
+        ok: true,
+        path: rawPath ?? null,
+        added: diff.added,
+        removed: diff.removed,
+        modified: diff.modified,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: message }, 400)
+    }
   })
 
   app.get('/raw/*', async (c) => {

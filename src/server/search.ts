@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import MiniSearch from 'minisearch'
 import path from 'node:path'
-import type { Vault } from './vault.js'
+import type { Vault, RefreshDiff } from './vault.js'
 import { stripFrontMatter } from './frontmatter.js'
 import type { SearchHit } from '../shared/types.js'
 
@@ -46,23 +46,33 @@ export class SearchIndex {
   constructor(private vault: Vault) {}
 
   async build(): Promise<void> {
-    const docs: Doc[] = []
-    for (const p of this.vault.allDocuments()) {
-      const abs = this.vault.resolve(p)
-      if (!abs) continue
-      try {
-        const raw = await readFile(abs, 'utf8')
-        const { data, body: bodySrc } = stripFrontMatter(raw)
-        const fallback = path.posix.basename(p).replace(/\.md$/i, '')
-        const title = data['title']?.trim() || deriveTitle(bodySrc, fallback)
-        const body = plainify(bodySrc)
-        docs.push({ id: p, path: p, title, body })
-      } catch {
-        // skip unreadable files
-      }
-    }
     this.index.removeAll()
-    this.index.addAll(docs)
+    for (const p of this.vault.allDocuments()) {
+      const doc = await this.buildDoc(p)
+      if (doc) this.index.add(doc)
+    }
+  }
+
+  /** Apply a tree-refresh diff incrementally — only re-reads changed files. */
+  async applyDiff(diff: RefreshDiff): Promise<void> {
+    for (const p of diff.removed) {
+      if (this.index.has(p)) this.index.discard(p)
+    }
+    for (const p of diff.added) {
+      const doc = await this.buildDoc(p)
+      if (!doc) continue
+      if (this.index.has(p)) this.index.replace(doc)
+      else this.index.add(doc)
+    }
+    for (const p of diff.modified) {
+      const doc = await this.buildDoc(p)
+      if (!doc) {
+        if (this.index.has(p)) this.index.discard(p)
+        continue
+      }
+      if (this.index.has(p)) this.index.replace(doc)
+      else this.index.add(doc)
+    }
   }
 
   query(q: string, limit = 25): SearchHit[] {
@@ -78,6 +88,21 @@ export class SearchIndex {
         score: r.score,
       }
     })
+  }
+
+  private async buildDoc(p: string): Promise<Doc | null> {
+    const abs = this.vault.resolve(p)
+    if (!abs) return null
+    try {
+      const raw = await readFile(abs, 'utf8')
+      const { data, body: bodySrc } = stripFrontMatter(raw)
+      const fallback = path.posix.basename(p).replace(/\.md$/i, '')
+      const title = data['title']?.trim() || deriveTitle(bodySrc, fallback)
+      const body = plainify(bodySrc)
+      return { id: p, path: p, title, body }
+    } catch {
+      return null
+    }
   }
 }
 
