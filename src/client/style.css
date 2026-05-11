@@ -631,9 +631,39 @@ body.marken-drawer-right-open .marken-scrim {
 }
 
 .marken-doc .task-list-item { list-style: none; }
-.marken-doc .task-list-item input[type='checkbox'] {
-  margin-right: 0.5em;
-  transform: translateY(1px);
+
+/* Task-list checkboxes ship with `disabled` (read-only viewer) — draw them
+ * ourselves so they keep their normal look instead of the browser's washed-
+ * out disabled rendering. */
+.marken-doc .task-list-item-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg);
+  margin: 0 0.5em 0 0;
+  vertical-align: -2px;
+  position: relative;
+  cursor: default;
+  opacity: 1;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.marken-doc .task-list-item-checkbox:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.marken-doc .task-list-item-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 .marken-doc kbd {
