@@ -199,7 +199,6 @@ kbd {
 .marken-side {
   background: var(--bg-elev);
   border-right: 1px solid var(--border);
-  overflow: hidden;
   position: relative;
 }
 .marken-side-right {
