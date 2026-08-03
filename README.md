@@ -13,6 +13,7 @@ Inspired by [Perlite](https://github.com/secure-77/Perlite). See [SPEC.md](./SPE
 - **Wiki-style links** — `[[Page]]` resolves by basename across the vault; `![[image.png]]` embeds assets.
 - **Full-text search** (in-memory, MiniSearch). Press `/` to focus.
 - **Dark / light themes** with a toggle in the `⋮` menu; respects `prefers-color-scheme` by default.
+- **Download PDF** via the `⋮` menu — uses the browser's native print pipeline with a tuned print stylesheet: light background, viewer chrome hidden, headings kept with their content, code blocks / tables / images kept whole, external URLs appended after link text.
 - **Trivial URL composition** — append the file's relative path to the base URL to get the viewer URL.
 - **Stateless and read-only** — no database, never writes to the vault.
 
