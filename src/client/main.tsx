@@ -96,6 +96,22 @@ function wireMenuDismiss() {
   })
 }
 
+function wireDownloadPdf() {
+  // "Download PDF" uses the browser's Print → Save as PDF. The doc's `<title>`
+  // is what browsers seed the filename with, and it's already the article
+  // title, so we don't need to munge it. `@media print` in style.css takes
+  // care of hiding chrome and forcing a light background.
+  document.querySelectorAll<HTMLButtonElement>('[data-action="download-pdf"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      // Close any open menu so it doesn't briefly linger in the print preview.
+      document.querySelectorAll<HTMLDetailsElement>('details[data-menu][open]').forEach((d) => {
+        d.open = false
+      })
+      window.print()
+    }),
+  )
+}
+
 function wireCopyLink() {
   document.querySelectorAll<HTMLButtonElement>('[data-action="copy-link"]').forEach((b) =>
     b.addEventListener('click', async () => {
@@ -137,6 +153,7 @@ function init() {
   wireTheme()
   wireMenuDismiss()
   wireCopyLink()
+  wireDownloadPdf()
   void wireMermaid()
 }
 

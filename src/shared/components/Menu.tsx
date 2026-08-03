@@ -24,6 +24,10 @@ export default function Menu({ docPath }: MenuProps) {
           <DownloadIcon />
           <span>Download Markdown</span>
         </a>
+        <button type="button" class="marken-menu-item" role="menuitem" data-action="download-pdf">
+          <PdfIcon />
+          <span>Download PDF</span>
+        </button>
         <button type="button" class="marken-menu-item" role="menuitem" data-action="copy-link">
           <LinkIcon />
           <span>Copy link</span>
@@ -41,6 +45,14 @@ function DownloadIcon() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" class="marken-icon" aria-hidden="true">
       <path d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM3.75 13a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z" />
+    </svg>
+  )
+}
+
+function PdfIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" class="marken-icon" aria-hidden="true">
+      <path d="M4 1.75A1.75 1.75 0 0 1 5.75 0h4.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237V14.25A1.75 1.75 0 0 1 13.25 16h-7.5A1.75 1.75 0 0 1 4 14.25V1.75Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25V5H10.5A1.5 1.5 0 0 1 9 3.5V1.5H5.75Zm4.75.31V3.5c0 .276.224.5.5.5h1.69L10.5 1.81ZM6.5 8.75A.75.75 0 0 1 7.25 8h1a1.75 1.75 0 1 1 0 3.5H8v.75a.75.75 0 0 1-1.5 0v-3.5Zm1.5 1.25h.25a.25.25 0 1 0 0-.5H8v.5Zm2.5-1.25A.75.75 0 0 1 11.25 8h.5a1.75 1.75 0 0 1 1.75 1.75v.5A1.75 1.75 0 0 1 11.75 12h-.5a.75.75 0 0 1-.75-.75v-2.5Zm1.5.75v1h.25a.25.25 0 0 0 .25-.25v-.5a.25.25 0 0 0-.25-.25H12ZM3.75 8A.75.75 0 0 1 4.5 8.75v2.5a.75.75 0 0 1-1.5 0v-2.5A.75.75 0 0 1 3.75 8Z" />
     </svg>
   )
 }

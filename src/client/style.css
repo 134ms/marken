@@ -799,3 +799,294 @@ body.marken-drawer-right-open .marken-scrim {
   *, *::before, *::after { transition: none !important; animation: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* -- Print / PDF ------------------------------------------------------- */
+
+/*
+ * "Download PDF" in the ⋮ menu calls `window.print()`. These rules turn the
+ * viewer chrome off and reflow the article into a print-friendly document
+ * with a forced light background — that's the deliverable, regardless of
+ * the user's on-screen theme.
+ *
+ * Best practices covered:
+ *   - Light palette forced via variable overrides (no color-scheme flip).
+ *   - Non-content UI hidden.
+ *   - `@page` margins tuned for A4/Letter.
+ *   - Widow/orphan control; headings stay with their following block.
+ *   - Code, tables, figures avoid mid-page breaks where possible.
+ *   - External URLs appended after link text so paper readers can follow them.
+ *   - `print-color-adjust: exact` keeps subtle background/borders on inline
+ *     code, task-list checkmarks, and syntax highlighting instead of the
+ *     browser bleaching them out.
+ */
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 20mm 16mm;
+}
+
+@media print {
+  /* Force the light palette. Any [data-theme] value on <html> is overridden. */
+  :root, html[data-theme='dark'], html[data-theme='light'] {
+    --bg: #ffffff;
+    --bg-elev: #ffffff;
+    --bg-sunken: #f6f7f9;
+    --bg-hover: #ffffff;
+    --bg-active: #ffffff;
+    --border: #d4d7de;
+    --border-strong: #b8bcc4;
+    --text: #111318;
+    --text-muted: #3a3f47;
+    --text-faint: #6b7280;
+    --link: #1a52c4;
+    --link-hover: #1a52c4;
+    --accent: #5a4ff3;
+    --accent-soft: rgba(90, 79, 243, 0.08);
+    --accent-strong: rgba(90, 79, 243, 0.14);
+    --code-bg: #f5f6f8;
+    --code-border: #e0e2e8;
+    --quote-bar: #c9ccd3;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #111318 !important;
+    font-size: 11.5pt;
+    line-height: 1.55;
+    scroll-behavior: auto;
+  }
+
+  /* Ensure the browser prints backgrounds we actually need (checkbox fill,
+   * inline code background, table header shading, syntax colors). */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Drop viewer chrome. */
+  .marken-header,
+  .marken-side,
+  .marken-scrim,
+  .marken-pager,
+  .marken-menu,
+  .marken-header-search,
+  script,
+  [data-island] > *:empty {
+    display: none !important;
+  }
+
+  /* Reset the grid so the article gets the full page width. */
+  .marken-app {
+    display: block !important;
+    min-height: 0 !important;
+  }
+  .marken-main {
+    grid-area: unset !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* Breadcrumb strip: keep it — useful context on paper — but tone it down. */
+  .marken-breadcrumbs {
+    color: #555a63 !important;
+    font-size: 10pt;
+    margin: 0 0 14pt 0;
+    padding-bottom: 6pt;
+    border-bottom: 0.5pt solid #d4d7de;
+  }
+  .marken-breadcrumbs a { color: inherit !important; text-decoration: none !important; }
+
+  /* Article body: wider than the on-screen `--content-max` since the page
+   * itself already constrains us via `@page` margins. */
+  .marken-doc {
+    max-width: none !important;
+    font-size: 11.5pt;
+    line-height: 1.6;
+    color: #111318 !important;
+    font-family: "Charter", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  }
+
+  /* Widow/orphan control on paragraphs and list items. */
+  .marken-doc p,
+  .marken-doc li,
+  .marken-doc blockquote {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Headings: don't strand a heading at the bottom of a page. */
+  .marken-doc h1,
+  .marken-doc h2,
+  .marken-doc h3,
+  .marken-doc h4,
+  .marken-doc h5,
+  .marken-doc h6 {
+    page-break-after: avoid;
+    break-after: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    color: #0d1017 !important;
+  }
+  .marken-doc h1 {
+    font-size: 22pt;
+    margin-top: 0;
+    padding-bottom: 4pt;
+    border-bottom: 0.5pt solid #d4d7de;
+  }
+  .marken-doc h2 {
+    font-size: 16pt;
+    padding-bottom: 3pt;
+    border-bottom: 0.5pt solid #e4e6eb;
+    page-break-before: auto;
+  }
+  .marken-doc h3 { font-size: 13.5pt; }
+  .marken-doc h4 { font-size: 12pt; }
+  .marken-doc h5 { font-size: 11pt; }
+  .marken-doc h6 { font-size: 10.5pt; }
+
+  /* Header-anchor links (#) are meaningless on paper. */
+  .marken-doc a.header-anchor { display: none !important; }
+
+  /* Hyperlinks: keep them visible, but append the URL after external links
+   * so a print reader can follow them. Skip the URL for in-page anchors
+   * (`#foo`) and mail/tel/js links. */
+  .marken-doc a {
+    color: #1a52c4 !important;
+    text-decoration: underline;
+    text-decoration-thickness: 0.5pt;
+    word-wrap: break-word;
+  }
+  .marken-doc a[href^="http://"]::after,
+  .marken-doc a[href^="https://"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #555a63;
+    word-break: break-all;
+  }
+  /* Don't append URLs for wiki-links or image links — noisy. */
+  .marken-doc a.marken-wikilink::after,
+  .marken-doc a:has(> img)::after { content: "" !important; }
+
+  /* Wiki-links look chip-y on screen; on paper, plain underlined text reads
+   * better. */
+  .marken-doc a.marken-wikilink {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    color: #1a52c4 !important;
+  }
+
+  /* Blockquotes. */
+  .marken-doc blockquote {
+    border-left: 2pt solid #b8bcc4;
+    color: #3a3f47 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Inline code and code blocks. */
+  .marken-doc code {
+    background: #f5f6f8 !important;
+    border: 0.5pt solid #e0e2e8 !important;
+    color: #111318 !important;
+    font-size: 0.88em;
+    word-wrap: break-word;
+  }
+  .marken-doc pre {
+    background: #f5f6f8 !important;
+    border: 0.5pt solid #e0e2e8 !important;
+    color: #111318 !important;
+    font-size: 9.5pt;
+    line-height: 1.45;
+    padding: 8pt 10pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    /* Wrap long lines so nothing gets clipped by the page edge. */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    overflow: visible;
+  }
+  .marken-doc pre code {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: transparent !important;
+    border: 0 !important;
+  }
+
+  /* Syntax highlighting: force the light-mode colors even if the user is
+   * in dark mode when they hit print. */
+  .hljs { color: #111318 !important; }
+  .hljs-comment, .hljs-quote { color: #6b7280 !important; }
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-link { color: #ad3da4 !important; }
+  .hljs-string, .hljs-attr, .hljs-template-variable, .hljs-meta-string { color: #036a96 !important; }
+  .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-meta { color: #b1382d !important; }
+  .hljs-title, .hljs-name, .hljs-type, .hljs-built_in { color: #2f6feb !important; }
+  .hljs-variable, .hljs-template-tag { color: #ad3da4 !important; }
+  .hljs-tag, .hljs-attribute { color: #036a96 !important; }
+  .hljs-regexp { color: #036a96 !important; }
+  .hljs-deletion { color: #b3261e !important; }
+  .hljs-addition { color: #1f7a3a !important; }
+
+  /* Tables. Undo the overflow-x scroller wrapper so wide tables get to lay
+   * themselves out on the page (browser will break inside if needed). */
+  .marken-doc table {
+    display: table !important;
+    width: 100% !important;
+    overflow: visible !important;
+    font-size: 10pt;
+    page-break-inside: auto;
+    border-collapse: collapse;
+  }
+  .marken-doc thead { display: table-header-group; }
+  .marken-doc tr { page-break-inside: avoid; break-inside: avoid; }
+  .marken-doc th, .marken-doc td {
+    border: 0.5pt solid #d4d7de !important;
+    padding: 5pt 8pt;
+  }
+  .marken-doc th { background: #f0f2f5 !important; }
+
+  /* Images and figures should stay whole. */
+  .marken-doc img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Mermaid: the SVG has already been rendered client-side; keep it whole. */
+  .marken-mermaid {
+    background: #ffffff !important;
+    border: 0.5pt solid #d4d7de !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Task lists: draw a clean printable checkbox. */
+  .marken-doc .task-list-item-checkbox {
+    border: 0.75pt solid #6b7280 !important;
+    background: #ffffff !important;
+  }
+  .marken-doc .task-list-item-checkbox:checked {
+    background: #111318 !important;
+    border-color: #111318 !important;
+  }
+  .marken-doc .task-list-item-checkbox:checked::after {
+    border-color: #ffffff !important;
+  }
+
+  /* Horizontal rules. */
+  .marken-doc hr {
+    border: 0;
+    border-top: 0.5pt solid #d4d7de;
+    margin: 12pt 0;
+  }
+
+  /* KaTeX math renders as HTML — keep it from splitting across pages. */
+  .katex-display,
+  .katex {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

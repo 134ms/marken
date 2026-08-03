@@ -12,7 +12,7 @@ A self-hosted, read-only Markdown viewer. You mount a folder of `.md` files into
 6. **Trivial URL composition.** `<base>/view/<relative-vault-path>.md` works for any document. No URL rewriting, no slug table — just concatenate. Keep the `.md` extension in URLs.
 7. **Desktop layout:** three panes — document tree (left), content (center), heading outline (right). The outline tracks scroll position.
 8. **Mobile layout:** single column. Tree and outline collapse into slide-in drawers with toggle buttons in the header.
-9. **`⋮` menu** in the header on both layouts. Currently: Download Markdown, Copy link, Toggle theme. (Add more here, not in a hidden settings page.)
+9. **`⋮` menu** in the header on both layouts. Currently: Download Markdown, Download PDF, Copy link, Toggle theme. (Add more here, not in a hidden settings page.)
 10. **Light and dark themes.** Default follows `prefers-color-scheme`; persisted choice overrides it. No FOUC.
 11. **Small container.** Final image is just the bundled server (`dist/server.js`, ~1.5 MB) plus static assets (~5 MB including KaTeX fonts and the lazy mermaid chunk). No `node_modules/` at runtime.
 
