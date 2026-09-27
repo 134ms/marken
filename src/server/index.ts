@@ -177,8 +177,8 @@ async function start() {
   })
 
   app.get('/', (c) => {
-    const first = vault.firstDocument()
-    if (first) return c.redirect(viewUrl(first))
+    const latest = vault.latestDocument()
+    if (latest) return c.redirect(viewUrl(latest))
     return c.html(renderEmptyVaultPage(config.vaultPath, config.siteTitle))
   })
 

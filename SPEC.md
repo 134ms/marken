@@ -36,7 +36,7 @@ Don't swap any of these without a reason. The size budget is the constraint that
 
 | Pattern | Purpose |
 |---|---|
-| `/` | Redirect to the first document, or render the empty-vault page |
+| `/` | Redirect to the most recently modified document, or render the empty-vault page |
 | `/view/<path>.md` | Render a vault file as HTML |
 | `/raw/<path>` | Serve a vault file as bytes (Markdown gets `Content-Disposition: attachment`; everything else by inferred MIME) |
 | `/api/tree` | Vault tree as JSON |
