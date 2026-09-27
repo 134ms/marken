@@ -25,7 +25,7 @@ docker run --rm \
   marken
 ```
 
-Open <http://localhost:8080>. Marken redirects to the first document in your vault.
+Open <http://localhost:8080>. Marken redirects to the most recently modified document in your vault.
 
 ## URL shape
 

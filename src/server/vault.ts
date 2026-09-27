@@ -188,8 +188,18 @@ export class Vault {
     return this.allMarkdownPaths
   }
 
-  firstDocument(): string | null {
-    return this.allMarkdownPaths[0] ?? null
+  /** Most recently modified document; ties go to whichever comes first in tree order. */
+  latestDocument(): string | null {
+    let latest: string | null = null
+    let latestMtime = -Infinity
+    for (const p of this.allMarkdownPaths) {
+      const m = this.fileMtimes.get(p) ?? -Infinity
+      if (latest === null || m > latestMtime) {
+        latest = p
+        latestMtime = m
+      }
+    }
+    return latest
   }
 
   /**
